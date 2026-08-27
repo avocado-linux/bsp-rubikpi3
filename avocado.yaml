@@ -200,8 +200,11 @@ extensions:
       # has no upstream CLM blob; the closely-related 43455 family blob
       # works in practice).
 
-      # --- Audio (HDMI-default routing via pipewire-PAL plugin) ---
-      qcom-pw-pal-plugin: '*'
+      # --- Audio ---
+      # The pipewire-PAL plugin (qcom-pw-pal-plugin) went with the meta-qcom-hwe
+      # stack; on the upstream kernel audio is mainline audioreach (ASoC
+      # snd-soc-sc7280 + q6apm) with linux-firmware-qcom-qcm6490-audio and
+      # -qcs6490-thundercomm-rubikpi3-audio above. No userspace plugin needed.
 
       # --- Wi-Fi (systemd-networkd DHCP profile + wpa_supplicant launcher) ---
       rubikpi-wifi: '*'                         # /etc/systemd/network/00-wireless-dhcp.network
