@@ -17,13 +17,25 @@ extensions:
     # current boot via on_merge/on_unmerge so the user doesn't need to
     # reboot to see the BSP take effect.
     #
+    # These lists CANNOT be feed-scoped: `ext build` resolves the ext config
+    # without a kernel version (get_merged_ext_config_with_board takes no
+    # kver), so `kernel-<spec>:` blocks are stripped before it reads
+    # enable_services. Every unit named here must therefore exist in the
+    # extension sysroot on BOTH feeds, or `ext build` fails with
+    # "enable_services lists X, but no such unit exists".
+    #
     # Intentionally NOT in this list:
     #   - bt.service        — Broadcom BSA daemon is opt-in (proprietary).
     #                         Users enable manually if they choose BSA over BlueZ.
+    #   - pipewire-pulse.socket — the 2026 feed has no pipewire at all (nothing
+    #                         builds it for this target now that the HWE PAL
+    #                         plugin is gone), and there is no PCM device there
+    #                         yet either (see the audio comment below). Re-add
+    #                         it once 2026 gains both a sound card node and a
+    #                         pipewire package, so the unit exists on both feeds.
     enable_services:
       - rubikpi-thermal.service
       - wifi.service
-      - pipewire-pulse.socket
 
     on_merge:
       - udevadm control --reload
@@ -31,10 +43,8 @@ extensions:
       - udevadm trigger --type=devices --action=add --settle
       - systemctl start --no-block rubikpi-thermal.service
       - systemctl start --no-block wifi.service
-      - systemctl start --no-block pipewire-pulse.socket
 
     on_unmerge:
-      - systemctl stop --no-block pipewire-pulse.socket
       - systemctl stop --no-block wifi.service
       - systemctl stop --no-block rubikpi-thermal.service
 
@@ -261,6 +271,14 @@ extensions:
         kernel-module-qcom-rproc-minidump: '*'
         linux-firmware-qcom-qcm6490-ipafw-updates: '*'
         linux-firmware-qcom-qcm6490-verinfo: '*'
+        # The HWE audio userspace: the PAL pipewire plugin (and pipewire itself,
+        # transitively). Dropped from the common list when the 2026 port removed
+        # meta-qcom-hwe, but it still exists in the 2024 feed and is what made
+        # audio work there -- scoping it here keeps that leg unchanged instead of
+        # regressing it. Note pipewire-pulse.socket is no longer auto-enabled
+        # (see enable_services above); on 2024 it needs
+        # `systemctl enable --now pipewire-pulse.socket`.
+        qcom-pw-pal-plugin: '*'
 
     # Upstream kernel. The common list was captured from an HWE-era lsmod, where
     # the downstream defconfig had these blocks built in (=y); upstream
