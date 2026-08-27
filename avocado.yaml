@@ -314,6 +314,16 @@ extensions:
         kernel-module-qcom-spmi-adc5: '*'             # adc@3100
         kernel-module-qcom-spmi-temp-alarm: '*'       # temp-alarm@2400, temp-alarm@a00
 
+        # --- systemd preset overrides + masks for this board ---
+        # Disables OE's `enable getty@.service` preset (rubikpi3 has no virtual
+        # console, so the instantiated unit fails a start-limit hit and leaves
+        # the system degraded) and masks boot.mount, the systemd-boot updaters
+        # and proc-fs-nfsd.mount. 2026-only: the recipe was never built into a
+        # feed before -- its only reference was MACHINE_ESSENTIAL_EXTRA_RDEPENDS,
+        # which avocado-cli's runtime rootfs does not consult -- so the 2024
+        # feed has no such package.
+        systemd-rubikpi3-masks: '*'
+
         # --- Audio DSP (mainline APR/QDSP6, replacing snd-soc-qcm6490) ---
         # These bind the enabled service@N nodes under the ADSP remoteproc and
         # provide the DAI/routing backends. No PCM device appears until the DTS
