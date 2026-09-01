@@ -17,13 +17,25 @@ extensions:
     # current boot via on_merge/on_unmerge so the user doesn't need to
     # reboot to see the BSP take effect.
     #
+    # These lists CANNOT be feed-scoped: `ext build` resolves the ext config
+    # without a kernel version (get_merged_ext_config_with_board takes no
+    # kver), so `kernel-<spec>:` blocks are stripped before it reads
+    # enable_services. Every unit named here must therefore exist in the
+    # extension sysroot on BOTH feeds, or `ext build` fails with
+    # "enable_services lists X, but no such unit exists".
+    #
     # Intentionally NOT in this list:
     #   - bt.service        — Broadcom BSA daemon is opt-in (proprietary).
     #                         Users enable manually if they choose BSA over BlueZ.
+    #   - pipewire-pulse.socket — the 2026 feed has no pipewire at all (nothing
+    #                         builds it for this target now that the HWE PAL
+    #                         plugin is gone), and there is no PCM device there
+    #                         yet either (see the audio comment below). Re-add
+    #                         it once 2026 gains both a sound card node and a
+    #                         pipewire package, so the unit exists on both feeds.
     enable_services:
       - rubikpi-thermal.service
       - wifi.service
-      - pipewire-pulse.socket
 
     on_merge:
       - udevadm control --reload
@@ -31,10 +43,8 @@ extensions:
       - udevadm trigger --type=devices --action=add --settle
       - systemctl start --no-block rubikpi-thermal.service
       - systemctl start --no-block wifi.service
-      - systemctl start --no-block pipewire-pulse.socket
 
     on_unmerge:
-      - systemctl stop --no-block pipewire-pulse.socket
       - systemctl stop --no-block wifi.service
       - systemctl stop --no-block rubikpi-thermal.service
 
@@ -50,18 +60,14 @@ extensions:
       kernel-module-usbnet: '*'
       kernel-module-xhci-pci: '*'
       kernel-module-xhci-pci-renesas: '*'
-      kernel-module-usb-f-qdss: '*'
 
       # --- Coresight / STM trace fabric ---
       kernel-module-coresight: '*'
       kernel-module-coresight-cti: '*'
-      kernel-module-coresight-csr: '*'
       kernel-module-coresight-dummy: '*'
       kernel-module-coresight-funnel: '*'
-      kernel-module-coresight-remote-etm: '*'
       kernel-module-coresight-replicator: '*'
       kernel-module-coresight-stm: '*'
-      kernel-module-coresight-tgu: '*'
       kernel-module-coresight-tmc: '*'
       kernel-module-coresight-tpda: '*'
       kernel-module-coresight-tpdm: '*'
@@ -69,7 +75,6 @@ extensions:
       kernel-module-stm-core: '*'
       kernel-module-stm-ftrace: '*'
       kernel-module-stm-heartbeat: '*'
-      kernel-module-stm-p-ost: '*'
 
       # --- Display / GPU (msm DRM driver) ---
       kernel-module-display-connector: '*'
@@ -79,7 +84,6 @@ extensions:
       kernel-module-drm-kms-helper: '*'
       kernel-module-gpu-sched: '*'
       kernel-module-llcc-qcom: '*'
-      kernel-module-msm-display: '*'
       kernel-module-ocmem: '*'
 
       # --- USB-C / Type-C / pmic-glink ---
@@ -100,7 +104,6 @@ extensions:
       kernel-module-rtc-pm8xxx: '*'
 
       # --- Audio (qcm6490 sound card + SoundWire + ASoC helpers) ---
-      kernel-module-snd-soc-qcm6490: '*'
       kernel-module-snd-soc-qcom-common: '*'
       kernel-module-snd-soc-qcom-sdw: '*'
       kernel-module-snd-soc-simple-card-utils: '*'
@@ -110,7 +113,6 @@ extensions:
       kernel-module-qcom-pil-info: '*'
       kernel-module-qcom-q6v5: '*'
       kernel-module-qcom-q6v5-pas: '*'
-      kernel-module-qcom-rproc-minidump: '*'
       kernel-module-qcom-sysmon: '*'
 
       # --- IPC: qrtr / GLINK / IPA ---
@@ -166,26 +168,28 @@ extensions:
       kernel-module-pwm-fan: '*'
 
       # --- Firmware (Qualcomm SoC) ---
-      # IMPORTANT: only ship the `-updates` package for IPA. The other
-      # `-updates` packages (audio, compute, wifi, qupv3fw) put `.mdt + .bNN`
-      # firmware into /lib/firmware/updates/ which causes drivers
-      # (snd_soc_qcm6490, fastrpc, etc.) to actively boot the ADSP / CDSP.
-      # The generic qcm6490 audio firmware crashes on the rubikpi3 board
-      # variant inside `charger_process` (see err_qdi.c:1122) which dangles
-      # the qcom,apr rpmsg endpoint and panics the kernel via gpr_send_pkt.
+      # Only the base (`.mbn`) packages are common to both feeds. The 2024
+      # linux-firmware recipe also splits out `-updates` subpackages carrying
+      # the `.mdt + .bNN` form; the 2026 one (meta-lts-mixins wrynose) ships
+      # none of them, and its qcm6490 firmware is `.mbn`-only. IPA's is the
+      # only `-updates` we ever wanted anyway, and it is scoped to the 2024
+      # feed in the kernel-6.6.* block below.
       #
-      # Until we have rubikpi3-specific `.mdt + .bNN` audio/compute firmware
-      # (the existing rubikpi3-specific package only ships `.mbn`), these
-      # remoteprocs are happier left `offline`. The kernel falls back to the
-      # `.mbn` form when something explicitly starts them.
+      # Why not the others: `-updates` packages drop `.mdt + .bNN` into
+      # /lib/firmware/updates/, which makes drivers actively boot the
+      # ADSP / CDSP. The generic qcm6490 audio firmware crashes on the
+      # rubikpi3 board variant inside `charger_process` (see err_qdi.c:1122),
+      # dangling the qcom,apr rpmsg endpoint and panicking the kernel via
+      # gpr_send_pkt. Until we have rubikpi3-specific `.mdt + .bNN`
+      # audio/compute firmware (the rubikpi3-specific package only ships
+      # `.mbn`), these remoteprocs are happier left `offline`; the kernel
+      # falls back to the `.mbn` form when something explicitly starts them.
       linux-firmware-qcom-qcm6490-adreno: '*'              # GPU firmware (a660_zap.mbn)
       linux-firmware-qcom-qcm6490-audio: '*'               # ADSP (adsp.mbn + jsons)
       linux-firmware-qcom-qcm6490-compute: '*'             # CDSP (cdsp.mbn + jsons)
       linux-firmware-qcom-qcm6490-ipa: '*'                 # IPA fw (ipa_fws.mbn fallback)
-      linux-firmware-qcom-qcm6490-ipafw-updates: '*'       # IPA fw (ipa_fws.mdt + .bNN) — kernel IPA driver requires this form
       linux-firmware-qcom-qcm6490-qupv3fw: '*'             # QUP serial-engine fw
       linux-firmware-qcom-qcm6490-wifi: '*'                # WPSS Wi-Fi/BT subsystem fw (wpss.mbn)
-      linux-firmware-qcom-qcm6490-verinfo: '*'             # version info blob (Ver_Info.txt)
       linux-firmware-qcom-qcs6490-thundercomm-rubikpi3-audio: '*'  # RUBIK Pi 3-specific audio tuning (.mbn variant)
       wireless-regdb-static: '*'
 
@@ -200,8 +204,22 @@ extensions:
       # has no upstream CLM blob; the closely-related 43455 family blob
       # works in practice).
 
-      # --- Audio (HDMI-default routing via pipewire-PAL plugin) ---
-      qcom-pw-pal-plugin: '*'
+      # --- Audio ---
+      # The pipewire-PAL plugin (qcom-pw-pal-plugin) went with the meta-qcom-hwe
+      # stack, so there is no userspace plugin on either feed. On the upstream
+      # kernel the DSP side is the mainline APR/QDSP6 stack (apr + q6core /
+      # q6afe / q6asm / q6adm / q6routing, listed in the kernel-6.18.* block
+      # below) rather than downstream snd_soc_qcm6490.
+      #
+      # KNOWN GAP on the 2026 feed: sc7280.dtsi declares `sound: sound { };` as
+      # an empty stub for the board DTS to fill, and our
+      # qcs6490-thundercomm-rubikpi3.dts does not fill it. With no card node
+      # nothing binds an ASoC machine driver, so the DSP backends probe but no
+      # PCM device appears. The fix belongs in the DTS (a `&sound` node whose
+      # compatible one of the mainline machine drivers claims -- for QCS6490
+      # that is snd-soc-sc8280xp, which matches qcom,qcm6490-idp-sndcard and
+      # qcom,qcs6490-rb3gen2-sndcard); add kernel-module-snd-soc-sc8280xp here
+      # in the same change.
 
       # --- Wi-Fi (systemd-networkd DHCP profile + wpa_supplicant launcher) ---
       rubikpi-wifi: '*'                         # /etc/systemd/network/00-wireless-dhcp.network
@@ -222,6 +240,113 @@ extensions:
       wiringrp: '*'
       wiringrp-gpio: '*'
       wiringrp-python: '*'
+
+    # ------------------------------------------------------------------------
+    # Per-kernel packages, same shape as the imx BSPs: avocado-cli installs the
+    # kernel-<version> block matching the feed's kernel, on top of the common
+    # list above. 2024 feed = meta-qcom-hwe downstream 6.6; 2026 feed =
+    # meta-qcom upstream-kernel BSP, linux-qcom 6.18.
+    # ------------------------------------------------------------------------
+
+    # Downstream-only, no mainline counterpart -- listing these on the 2026 feed
+    # fails the whole install with "No match for argument".
+    #   usb-f-qdss, coresight-csr/-remote-etm/-tgu, stm-p-ost
+    #       Qualcomm's out-of-tree QDSS/Coresight trace extensions. The mainline
+    #       Coresight/STM modules that do exist are in the common list.
+    #   qcom-rproc-minidump
+    #       downstream minidump; mainline ships no equivalent module.
+    #   msm-display, snd-soc-qcm6490
+    #       superseded upstream -- see the kernel-6.18.* replacements below.
+    # The two firmware packages are the same story from linux-firmware rather
+    # than from the kernel (see the firmware comment above).
+    kernel-6.6.*:
+      packages:
+        kernel-module-usb-f-qdss: '*'
+        kernel-module-coresight-csr: '*'
+        kernel-module-coresight-remote-etm: '*'
+        kernel-module-coresight-tgu: '*'
+        kernel-module-stm-p-ost: '*'
+        kernel-module-msm-display: '*'
+        kernel-module-snd-soc-qcm6490: '*'
+        kernel-module-qcom-rproc-minidump: '*'
+        linux-firmware-qcom-qcm6490-ipafw-updates: '*'
+        linux-firmware-qcom-qcm6490-verinfo: '*'
+        # The HWE audio userspace: the PAL pipewire plugin (and pipewire itself,
+        # transitively). Dropped from the common list when the 2026 port removed
+        # meta-qcom-hwe, but it still exists in the 2024 feed and is what made
+        # audio work there -- scoping it here keeps that leg unchanged instead of
+        # regressing it. Note pipewire-pulse.socket is no longer auto-enabled
+        # (see enable_services above); on 2024 it needs
+        # `systemctl enable --now pipewire-pulse.socket`.
+        qcom-pw-pal-plugin: '*'
+
+    # Upstream kernel. The common list was captured from an HWE-era lsmod, where
+    # the downstream defconfig had these blocks built in (=y); upstream
+    # qcom_defconfig builds them as modules, so they have to be installed
+    # explicitly. Every entry here binds a node that is present and enabled in
+    # qcs6490-thundercomm-rubikpi3.dtb -- checked by matching each enabled
+    # node's compatible against the OF aliases in this kernel's .ko set and
+    # modules.builtin.modinfo.
+    kernel-6.18.*:
+      packages:
+        # --- Display / GPU ---
+        # Mainline drm/msm (DPU is built into msm.ko: CONFIG_DRM_MSM_DPU=y),
+        # replacing downstream msm-display. It pulls the drm helper modules via
+        # RPM requires; the clock controllers do not come with it -- they bind
+        # their own DT nodes and are needed for display and GPU to come up.
+        kernel-module-msm: '*'                        # gpu@3d00000, DPU, DSI
+        kernel-module-dispcc-sc7280: '*'              # clock-controller@af00000
+        kernel-module-gpucc-sc7280: '*'               # clock-controller@3d90000
+        kernel-module-lontium-lt9611: '*'             # hdmi-bridge@39 (lontium,lt9611)
+
+        # --- Buses / PHYs ---
+        # i2c@984000 and i2c@a84000 carry the HDMI bridge and the audio amp;
+        # spi-geni-qcom is in the common list but its I2C sibling was built in
+        # downstream, so it was never listed.
+        kernel-module-i2c-qcom-geni: '*'              # i2c@984000, i2c@a84000
+        kernel-module-phy-qcom-snps-femto-v2: '*'     # phy@88e3000, phy@88e4000 (USB HS)
+
+        # --- PMIC: PWM, ADC, thermal ---
+        # The pwm-fan node's provider is the pm8350c `pwm` node, driven by
+        # leds-qcom-lpg -- without it kernel-module-pwm-fan (common list) has no
+        # PWM to drive and rubikpi3-thermal has nothing under /sys/class/pwm.
+        kernel-module-leds-qcom-lpg: '*'              # pwm (qcom,pm8350c-pwm)
+        kernel-module-qcom-spmi-adc5: '*'             # adc@3100
+        kernel-module-qcom-spmi-temp-alarm: '*'       # temp-alarm@2400, temp-alarm@a00
+
+        # --- systemd preset overrides + masks for this board ---
+        # Disables OE's `enable getty@.service` preset (rubikpi3 has no virtual
+        # console, so the instantiated unit fails a start-limit hit and leaves
+        # the system degraded) and masks boot.mount, the systemd-boot updaters
+        # and proc-fs-nfsd.mount. 2026-only: the recipe was never built into a
+        # feed before -- its only reference was MACHINE_ESSENTIAL_EXTRA_RDEPENDS,
+        # which avocado-cli's runtime rootfs does not consult -- so the 2024
+        # feed has no such package.
+        systemd-rubikpi3-masks: '*'
+
+        # --- Audio DSP (mainline APR/QDSP6, replacing snd-soc-qcm6490) ---
+        # These bind the enabled service@N nodes under the ADSP remoteproc and
+        # provide the DAI/routing backends. No PCM device appears until the DTS
+        # gains a `&sound` card node -- see the audio comment above.
+        kernel-module-lpassaudiocc-sc7280: '*'        # clock-controller@3300000
+        kernel-module-apr: '*'                        # apr
+        kernel-module-q6core: '*'                     # service@3
+        kernel-module-q6afe: '*'                      # service@4
+        kernel-module-q6afe-dai: '*'                  # dais
+        kernel-module-q6afe-clocks: '*'               # clock-controller
+        kernel-module-q6asm: '*'                      # service@7
+        kernel-module-q6asm-dai: '*'                  # dais
+        kernel-module-q6adm: '*'                      # service@8
+        kernel-module-q6routing: '*'                  # routing
+
+        # Deliberately not listed, though the dtb has enabled nodes for them:
+        #   camcc-sc7280            camera clocks; no camera support here
+        #   videocc-sc7280 + qcom-iris  hardware video codec; absent from the
+        #                           2024 set too, so not a regression
+        #   fastrpc (+compute-cb)   CDSP offload; the CDSP is deliberately left
+        #                           offline (see the firmware comment)
+        #   q6usb                   USB audio offload; needs the card first
+        #   nvmem-reboot-mode       reboot-mode via nvmem, not used by avocado
 
 sdk:
   image: docker.io/avocadolinux/sdk:{{ env.AVOCADO_DISTRO_RELEASE }}
