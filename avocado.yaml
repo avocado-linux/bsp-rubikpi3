@@ -4,7 +4,7 @@ supported_targets:
 
 extensions:
   avocado-bsp-rubikpi3:
-    version: 0.2.2
+    version: 0.2.3
     release: r0
     summary: Board support for the Thundercomm RUBIK Pi 3 (QCS6490)
     description: Board support for the Thundercomm RUBIK Pi 3 (QCS6490)
@@ -355,25 +355,26 @@ extensions:
         libgbm: '*'
 
         # --- NPU / CDSP compute offload (Hexagon DSP via FastRPC) ---
-        # DEFERRED: does not work on this board yet. The compute stack would be
-        # fastrpc (userspace RPC), kernel-module-fastrpc (fastrpc + compute-cb
-        # DT nodes) and hexagon-dsp-binaries-...-cdsp (the CDSP image).
+        # fastrpc = the userspace RPC glue (cdsprpcd + libcdsprpc); its kernel
+        # module binds the fastrpc + compute-cb DT nodes and creates /dev/fastrpc.
+        # The CDSP firmware is the base linux-firmware cdsp.mbn already pulled in
+        # the common list (linux-firmware-qcom-qcm6490-compute).
         #
-        # Real blocker (verified on hw 2026-09-19), NOT a version skew: the CDSP
-        # firmware fails PAS authentication in TrustZone. Both DSP remoteprocs
-        # enumerate and attempt boot, then die with "qcom_q6v5_pas ... error -22
-        # initializing firmware" (PAS_INIT_IMAGE / TZ metadata auth), for the
-        # generic linux-firmware cdsp.mbn AND for the board-specific
-        # Thundercomm/RubikPi3 adsp.mbn -- i.e. the images present are not signed
-        # for this board's fused key. On top of that,
-        # hexagon-dsp-binaries-thundercomm-rubikpi3-cdsp is an empty stub rpm (no
-        # .mbn), so the feed cannot supply a working image. This is the same DSP
-        # signing wall as rb3gen2; unblocking needs a board-matched signed CDSP
-        # firmware, which is outside this layer set. Enable + validate cdsp
-        # remoteproc and /dev/fastrpc once such a firmware exists.
-        # fastrpc: "*"
-        # kernel-module-fastrpc: "*"                  # fastrpc, compute-cb
-        # hexagon-dsp-binaries-thundercomm-rubikpi3-cdsp: "*"
+        # This works ONLY when the board is provisioned with the Gunyah XBL
+        # config (avocado provision, default AVOCADO_HYPERVISOR=gunyah). The
+        # earlier "-22 PAS auth wall" was NOT a firmware-signing problem: it was
+        # the KVM XBL config, under which Linux owns EL2 and there is no Qualcomm
+        # secure-memory mediation, so PAS_INIT_IMAGE rejects every DSP/GPU image.
+        # Under Gunyah the cdsp (and adsp) remoteprocs authenticate and run --
+        # verified on hardware 2026-09-19. If a board is provisioned with
+        # AVOCADO_HYPERVISOR=kvm these stay offline (expected; KVM is exclusive
+        # with DSP/GPU on this SoC).
+        #
+        # hexagon-dsp-binaries-thundercomm-rubikpi3-cdsp is left out on purpose:
+        # that rpm is an empty stub (no .mbn); the CDSP boots from the base
+        # cdsp.mbn above, and the -dsp-binaries only add per-workload skels.
+        fastrpc: '*'
+        kernel-module-fastrpc: '*'                  # fastrpc, compute-cb; creates /dev/fastrpc
 
         # Deliberately not listed, though the dtb has enabled nodes for them:
         #   camcc-sc7280            camera clocks; no camera support here
