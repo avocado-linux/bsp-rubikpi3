@@ -4,7 +4,7 @@ supported_targets:
 
 extensions:
   avocado-bsp-rubikpi3:
-    version: 0.2.0
+    version: 0.2.1
     release: r0
     summary: Board support for the Thundercomm RUBIK Pi 3 (QCS6490)
     description: Board support for the Thundercomm RUBIK Pi 3 (QCS6490)
@@ -353,17 +353,25 @@ extensions:
         libgbm: '*'
 
         # --- NPU / CDSP compute offload (Hexagon DSP via FastRPC) ---
-        # Brings the compute DSP up: fastrpc is the userspace RPC channel
-        # (cdsprpcd + libcdsprpc), kernel-module-fastrpc binds the enabled
-        # fastrpc + compute-cb DT nodes, and hexagon-dsp-binaries-...-cdsp is
-        # the unsigned CDSP image; the CDSP remoteproc firmware (linux-firmware-
-        # qcom-qcm6490-compute) and the q6v5-pas loader are already installed.
-        # This is the compute (cdsp) path; the audio (adsp) DSP stays offline
-        # (its generic firmware crashes on this board -- see the firmware note).
-        # 2026-only, so scoped here like the GPU userspace above.
-        fastrpc: '*'
-        kernel-module-fastrpc: '*'                    # fastrpc, compute-cb
-        hexagon-dsp-binaries-thundercomm-rubikpi3-cdsp: '*'
+        # DEFERRED: does not work on this board yet. The compute stack would be
+        # fastrpc (userspace RPC), kernel-module-fastrpc (fastrpc + compute-cb
+        # DT nodes) and hexagon-dsp-binaries-...-cdsp (the CDSP image).
+        #
+        # Real blocker (verified on hw 2026-09-19), NOT a version skew: the CDSP
+        # firmware fails PAS authentication in TrustZone. Both DSP remoteprocs
+        # enumerate and attempt boot, then die with "qcom_q6v5_pas ... error -22
+        # initializing firmware" (PAS_INIT_IMAGE / TZ metadata auth), for the
+        # generic linux-firmware cdsp.mbn AND for the board-specific
+        # Thundercomm/RubikPi3 adsp.mbn -- i.e. the images present are not signed
+        # for this board's fused key. On top of that,
+        # hexagon-dsp-binaries-thundercomm-rubikpi3-cdsp is an empty stub rpm (no
+        # .mbn), so the feed cannot supply a working image. This is the same DSP
+        # signing wall as rb3gen2; unblocking needs a board-matched signed CDSP
+        # firmware, which is outside this layer set. Enable + validate cdsp
+        # remoteproc and /dev/fastrpc once such a firmware exists.
+        # fastrpc: "*"
+        # kernel-module-fastrpc: "*"                  # fastrpc, compute-cb
+        # hexagon-dsp-binaries-thundercomm-rubikpi3-cdsp: "*"
 
         # Deliberately not listed, though the dtb has enabled nodes for them:
         #   camcc-sc7280            camera clocks; no camera support here
