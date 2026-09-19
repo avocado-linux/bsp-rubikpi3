@@ -4,7 +4,7 @@ supported_targets:
 
 extensions:
   avocado-bsp-rubikpi3:
-    version: 0.2.1
+    version: 0.2.2
     release: r0
     summary: Board support for the Thundercomm RUBIK Pi 3 (QCS6490)
     description: Board support for the Thundercomm RUBIK Pi 3 (QCS6490)
@@ -184,7 +184,8 @@ extensions:
       # audio/compute firmware (the rubikpi3-specific package only ships
       # `.mbn`), these remoteprocs are happier left `offline`; the kernel
       # falls back to the `.mbn` form when something explicitly starts them.
-      linux-firmware-qcom-qcm6490-adreno: '*'              # GPU firmware (a660_zap.mbn)
+      linux-firmware-qcom-qcm6490-adreno: '*'              # GPU zap shader (a660_zap.mbn)
+      linux-firmware-qcom-adreno-a660: '*'                 # GPU CP microcode + GMU (a660_sqe.fw, a660_gmu.bin) -- required for the Adreno to boot; verified missing on hw 2026-09-19 (msm: "failed to load a660_sqe.fw")
       linux-firmware-qcom-qcm6490-audio: '*'               # ADSP (adsp.mbn + jsons)
       linux-firmware-qcom-qcm6490-compute: '*'             # CDSP (cdsp.mbn + jsons)
       linux-firmware-qcom-qcm6490-ipa: '*'                 # IPA fw (ipa_fws.mbn fallback)
@@ -340,9 +341,10 @@ extensions:
         kernel-module-q6routing: '*'                  # routing
 
         # --- GPU userspace (Adreno 643, mainline drm/msm + Mesa Turnip) ---
-        # The kernel side (kernel-module-msm + gpucc/dispcc above, a660 zap
-        # firmware in the common list) is already installed; these make the GPU
-        # usable from userspace. mesa-vulkan-drivers is the Turnip Vulkan ICD;
+        # The kernel side (kernel-module-msm + gpucc/dispcc above) plus the GPU
+        # firmware in the common list (a660 zap shader AND the a660 CP/GMU
+        # microcode -- linux-firmware-qcom-adreno-a660) are installed; these make
+        # the GPU usable from userspace. mesa-vulkan-drivers is the Turnip Vulkan ICD;
         # the rest are the Gallium DRI driver, GLES, EGL and GBM. 2026-only feed
         # packages (packagegroup-avocado-qcom-extra qcm6490 block), so scoped
         # here rather than the common list, which also feeds the 2024 build.
