@@ -345,10 +345,14 @@ extensions:
         # firmware in the common list (a660 zap shader AND the a660 CP/GMU
         # microcode -- linux-firmware-qcom-adreno-a660) are installed; these make
         # the GPU usable from userspace. mesa-vulkan-drivers is the Turnip Vulkan ICD;
-        # the rest are the Gallium DRI driver, GLES, EGL and GBM. 2026-only feed
+        # the rest are the Gallium DRI driver, GLES, EGL and GBM. vulkan-loader
+        # (libvulkan1, libvulkan.so.1) is listed explicitly: mesa-vulkan-drivers
+        # neither requires nor recommends it, and without the loader no Vulkan
+        # app can reach the ICD. 2026-only feed
         # packages (packagegroup-avocado-qcom-extra qcm6490 block), so scoped
         # here rather than the common list, which also feeds the 2024 build.
         mesa-vulkan-drivers: '*'
+        vulkan-loader: '*'
         mesa-megadriver: '*'
         libgles2-mesa: '*'
         libegl-mesa: '*'
@@ -366,9 +370,9 @@ extensions:
         # the KVM XBL config, under which Linux owns EL2 and there is no Qualcomm
         # secure-memory mediation, so PAS_INIT_IMAGE rejects every DSP/GPU image.
         # Under Gunyah the cdsp (and adsp) remoteprocs authenticate and run --
-        # verified on hardware 2026-09-19. If a board is provisioned with
-        # AVOCADO_HYPERVISOR=kvm these stay offline (expected; KVM is exclusive
-        # with DSP/GPU on this SoC).
+        # verified on hardware 2026-09-19. Provisioned with AVOCADO_HYPERVISOR=kvm
+        # they stay offline on this board: the KVM DSP path needs the kodiak-el2
+        # overlay and newer boot binaries, which the RUBIK Pi 3 does not have.
         #
         # hexagon-dsp-binaries-thundercomm-rubikpi3-cdsp is left out on purpose:
         # that rpm is an empty stub (no .mbn); the CDSP boots from the base
