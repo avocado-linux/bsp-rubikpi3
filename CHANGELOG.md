@@ -4,6 +4,14 @@ All notable changes to avocado-bsp-rubikpi3 are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2]
+
+### Fixed
+- `avocado deploy` failing at slot detection on the 2026 feed. The stone config
+  runs `avocado-bls current-slot`, but avocado-bls is feed-only and nothing
+  installed it. The BSP now installs `avocado-bls` in the `kernel-6.18.*` block;
+  the 2024 feed has no avocado-bls.
+
 ## [0.1.1]
 
 ### Added

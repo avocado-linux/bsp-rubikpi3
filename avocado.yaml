@@ -4,7 +4,7 @@ supported_targets:
 
 extensions:
   avocado-bsp-rubikpi3:
-    version: 0.1.1
+    version: 0.1.2
     release: r0
     summary: Board support for the Thundercomm RUBIK Pi 3 (QCS6490)
     description: Board support for the Thundercomm RUBIK Pi 3 (QCS6490)
@@ -289,6 +289,11 @@ extensions:
     # modules.builtin.modinfo.
     kernel-6.18.*:
       packages:
+        # A/B slot detection for avocadoctl updates (stone update.slot_detection
+        # runs `avocado-bls current-slot`); feed-only, so the BSP installs it.
+        # Here rather than in the common list: the 2024 feed has no avocado-bls.
+        avocado-bls: '*'
+
         # --- Display / GPU ---
         # Mainline drm/msm (DPU is built into msm.ko: CONFIG_DRM_MSM_DPU=y),
         # replacing downstream msm-display. It pulls the drm helper modules via
